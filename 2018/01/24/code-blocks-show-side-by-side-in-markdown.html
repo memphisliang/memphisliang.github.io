@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+        <meta charset="utf-8">
+        <link rel="stylesheet" href="/assets/css/style.css">
+        <title>网页中代码块并排显示</title>
+    </head>
+
+    <body>
+        <div class="container">
+            <div id="header" class="module">
+    <div class="header-links">
+        [<a href="/">首页</a>]
+        [<a href="https://github.com/memphisliang">@Github</a>]
+    </div>
+</div>
+
+
+<div id="content" class="module">
+    <div class="article">
+        <h1 id="网页中代码块并排显示">网页中代码块并排显示</h1>
+
+<p>最近在撰写博客文章时遇到一个问题，就是在文章中编写代码示例的时候，看到别的网站把对应的代码示例并排显示在一起，显得十分方便，如下：</p>
+
+<pre><code class="language-example"># foo
+## foo
+### foo
+#### foo
+##### foo
+###### foo
+&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;
+&lt;h1&gt;foo&lt;/h1&gt;
+&lt;h2&gt;foo&lt;/h2&gt;
+&lt;h3&gt;foo&lt;/h3&gt;
+&lt;h4&gt;foo&lt;/h4&gt;
+&lt;h5&gt;foo&lt;/h5&gt;
+&lt;h6&gt;foo&lt;/h6&gt;
+</code></pre>
+
+<p>可以看到，左边的是Markdown代码，而右边显示的是对应的HTML代码，这在某些场合是十分方便直观的。</p>
+
+<p>那么这里有什么问题呢？主要是笔者是使用Markdown来编写文章的，要实现这样的效果，最直接的方法是在Markdown文档代码块对应的位置插入大量的HTML代码，但这样就破坏了Markdown的初衷——在文字格式下直观的看到结果，而且代码重复出现也不好，所以这篇文章的目的就是美观的实现代码的并排显示效果。</p>
+
+<h2 id="解决方案">解决方案</h2>
+
+<p>在解决方法中会使用到一种Markdown语法，在这里先介绍这种语法的用途。</p>
+
+<p>在CommonMark的Markdown语法中，只要在代码块开始处加上描述字符串，就可以在生成的HTML代码中加上对应的<code class="highlighter-rouge">class</code>属性，属性值为<code class="highlighter-rouge">language-</code>前缀后接描述字符串：</p>
+
+<pre><code class="language-example">``` python
+if TRUE:
+    print("Hello, world!")
+```
+&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;
+&lt;pre&gt;&lt;code class="language-python"&gt;if TRUE:
+    print("Hello, world!")
+&lt;/code&gt;&lt;/pre&gt;
+</code></pre>
+
+<p>根据这种语法，可以给代码块中<code class="highlighter-rouge">code</code>元素的<code class="highlighter-rouge">class</code>属性设置为<code class="highlighter-rouge">language-example</code>，然后就是对这个块进行处理了。</p>
+
+<h3 id="解决思路">解决思路</h3>
+
+<p>笔者的思路是这样的，首先把要并排显示的代码内容写在一个代码块里，中间用字符串（<code class="highlighter-rouge">&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;</code>）来分隔它们（后期使用这个字符串来区分两段代码，可以使用其他字符串来分隔，但要修改JavaScript代码），之后就是使用JavaScript脚本来对这个代码进行处理了，具体例子如下：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>~~~ example
+# foo
+## foo
+### foo
+&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;
+&lt;h1&gt;foo&lt;/h1&gt;
+&lt;h2&gt;foo&lt;/h2&gt;
+&lt;h3&gt;foo&lt;/h3&gt;
+~~~
+</code></pre></div></div>
+
+<p>然后就是对这个代码进行处理，具体步骤如下：</p>
+
+<ul>
+  <li>使用JavaScript脚本找到<code class="highlighter-rouge">class</code>属性为<code class="highlighter-rouge">language-example</code>的<code class="highlighter-rouge">&lt;code&gt;</code>块。</li>
+  <li>获取<code class="highlighter-rouge">&lt;code&gt;</code>中的内容，然后删除该<code class="highlighter-rouge">&lt;code&gt;</code>块。</li>
+  <li>根据文本中的<code class="highlighter-rouge">·</code>符号分隔成两段文本（代码）。</li>
+  <li>在<code class="highlighter-rouge">&lt;pre&gt;</code>块中新增两个<code class="highlighter-rouge">&lt;code&gt;</code>块，分别填入两段文本。</li>
+  <li>对两个<code class="highlighter-rouge">&lt;code&gt;</code>块设置CSS规则，使其并排显示。</li>
+</ul>
+
+<p>要注意的是，虽然上面的步骤中写明要删除原本的<code class="highlighter-rouge">&lt;code&gt;</code>块，但实现中不会删除，而是在这个块后面新增一个<code class="highlighter-rouge">&lt;code&gt;</code>来存放第二段代码，这样做的原因是为了实现方便。</p>
+
+<p>笔者在Markdown文档的最后添加JavaScript代码，这样在转换为HTML文档之后，可以使JavaScript脚本只对这个HTML文档生效，而且在阅读Markdown文档时不会让Markdown和JavaScript代码混淆在一起，影响阅读。</p>
+
+<h3 id="实现">实现</h3>
+
+<p>具体的JavaScript代码如下：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// 分隔字符串，后面要加'\n'
+split_str = "&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;" + '\n'
+// 获取所有需要处理的&lt;code&gt;块
+codes = document.getElementsByClassName("language-example");
+
+for(i = 0; i &lt; codes.length; i++) {
+    // 获取两段代码，之后用来设置两个&lt;code&gt;的文本。
+    text_array = codes[i].innerText.split(split_str);
+    text1 = text_array[0];
+    text2 = text_array[1];
+    // 在&lt;pre&gt;块中设置两个&lt;code&gt;块来放置两段代码。
+    codes[i].innerText = text1;
+    // 生成一个新的&lt;code&gt;块。
+    new_code = document.createElement("code");
+    new_code.innerText = text2;
+    codes[i].parentElement.appendChild(new_code);
+    codes[i].parentElement.className += "clear-float"; //清除浮动
+}
+</code></pre></div></div>
+
+<p>上面的JavaScript代码是用来把每一个带<code class="highlighter-rouge">language-example</code>的<code class="highlighter-rouge">class</code>属性的<code class="highlighter-rouge">&lt;code&gt;</code>块分隔成两个，记住，只有带有<code class="highlighter-rouge">example</code>描述字符串的代码块会被这样处理，其他的代码块不会收到影响。</p>
+
+<p>然后是给这两个<code class="highlighter-rouge">&lt;code&gt;</code>块设置CSS规则：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>style_str = `
+code.language-example,
+code.language-example + code {
+    width: 50%;
+    display: block;
+    margin: 0;
+    padding: 0;
+    float: left;
+    background-color: #C9CACE;
+
+    white-space: pre-wrap;       /* css-3 */
+    white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
+    white-space: -pre-wrap;      /* Opera 4-6 */
+    white-space: -o-pre-wrap;    /* Opera 7 */
+    word-wrap: break-word;       /* Internet Explorer 5.5+ */
+}
+
+code.language-example {
+    background-color: #D3E1E4;
+}
+.clear-float {
+    overflow: auto;
+}`;
+
+style_node = document.createElement("style");
+style_node.innerText = style_str;
+document.getElementsByTagName("head")[0].appendChild(style_node);
+</code></pre></div></div>
+
+<p>上面的CSS规则中的一系列<code class="highlighter-rouge">white-space</code>是使代码内容超过容器宽度的时候，会自动换行，详细作用可以看这篇博客<a href="https://blog.brain1981.com/706.html">《英文单词断行问题》</a>。</p>
+
+<h3 id="结果">结果</h3>
+
+<p>全部代码如下：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>&lt;script&gt;
+split_str = "&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;" + '\n'
+codes = document.getElementsByClassName("language-example");
+for(i = 0; i &lt; codes.length; i++) {
+    text_array = codes[i].innerText.split(split_str);
+    text1 = text_array[0];
+    text2 = text_array[1];
+    codes[i].innerText = text1;
+    new_code = document.createElement("code");
+    new_code.innerText = text2;
+    codes[i].parentElement.appendChild(new_code);
+    codes[i].parentElement.className += "clear-float";
+}
+
+style_str = `
+code.language-example,
+code.language-example + code {
+    width: 50%;
+    display: block;
+    margin: 0;
+    padding: 0;
+    float: left;
+    background-color: #C9CACE;
+    white-space: pre-wrap;       /* css-3 */
+    white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
+    white-space: -pre-wrap;      /* Opera 4-6 */
+    white-space: -o-pre-wrap;    /* Opera 7 */
+    word-wrap: break-word;       /* Internet Explorer 5.5+ */
+}
+code.language-example {
+    background-color: #D3E1E4;
+}
+.clear-float {
+    overflow: auto;
+}`;
+style_node = document.createElement("style");
+style_node.innerText = style_str;
+document.getElementsByTagName("head")[0].appendChild(style_node);
+&lt;/script&gt;
+</code></pre></div></div>
+
+<p>在Markdown文档的最后添加上面的代码，然后使用Markdown解释器转换成HTML文档，在打开就可以看到结果。</p>
+
+<p>例如，Markdown文档如下：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>~~~ example
+# foo
+## foo
+### foo
+&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;
+&lt;h1&gt;foo&lt;/h1&gt;
+&lt;h2&gt;foo&lt;/h2&gt;
+&lt;h3&gt;foo&lt;/h3&gt;
+~~~
+
+// 这里有一大段的代码，就不贴出来了。
+</code></pre></div></div>
+
+<p>然后是最后结果：</p>
+
+<p><img src="https://i.loli.net/2018/01/24/5a67fcd63dff9.jpg" alt="最终结果" title="最终结果" /></p>
+
+<p>注意：笔者只在Firefox-57.0.4和Chrome63.0.3239这两个浏览器中进行了测试，不能保证其他浏览器中不会出现问题，希望大家见谅。</p>
+
+<h3 id="其他问题">其他问题</h3>
+
+<p><img src="https://i.loli.net/2018/01/24/5a67fc92478a8.jpg" alt="空白节点导致不并排显示" title="空白节点导致不并排显示" /></p>
+
+<p>在一些浏览器中可能会出现代码没有并排显示的问题，这有可能是因为在两个<code class="highlighter-rouge">&lt;code&gt;</code>之间有其他的空白节点导致的，例如Firefox浏览器就可能在两者之间插入一个<code class="highlighter-rouge">#text</code>的空白节点，建议在浏览器的控制台中使用JavaScript来查看是否有这样的问题。</p>
+
+<!--------------- 链接 --------------->
+
+<!--------------- 脚本 --------------->
+
+<script>
+split_str = "<<<<<<<<<<>>>>>>>>>>" + '\n'
+codes = document.getElementsByClassName("language-example");
+for(i = 0; i < codes.length; i++) {
+    text_array = codes[i].innerText.split(split_str);
+    text1 = text_array[0];
+    text2 = text_array[1];
+    codes[i].innerText = text1;
+    new_code = document.createElement("code");
+    new_code.innerText = text2;
+    codes[i].parentElement.appendChild(new_code);
+    codes[i].parentElement.className += "clear-float";
+}
+
+style_str = `
+code.language-example,
+code.language-example + code {
+    width: 50%;
+    display: block;
+    margin: 0;
+    padding: 0;
+    float: left;
+    background-color: #C9CACE;
+    white-space: pre-wrap;       /* css-3 */
+    white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
+    white-space: -pre-wrap;      /* Opera 4-6 */
+    white-space: -o-pre-wrap;    /* Opera 7 */
+    word-wrap: break-word;       /* Internet Explorer 5.5+ */
+}
+code.language-example {
+    background-color: #D3E1E4;
+}
+.clear-float {
+    overflow: auto;
+}`;
+style_node = document.createElement("style");
+style_node.innerText = style_str;
+document.getElementsByTagName("head")[0].appendChild(style_node);
+</script>
+
+
+    </div>
+</div>
+
+        </div>
+    </body>
+</html>
