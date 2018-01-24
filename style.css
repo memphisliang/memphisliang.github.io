@@ -1,0 +1,69 @@
+/******** Layout **********/
+
+body,
+div {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: #dddddd;
+    color: #333333;
+}
+
+.container {
+    margin: auto;
+    padding: 20px 0;
+    width: 720px;
+}
+
+.module {
+    width: 640px;
+    background: #ffffff;
+    margin: 0 auto 10px;
+    padding: 20px 40px;
+    border-radius: 9px;
+    box-shadow: 0 5px 5px #333333;
+}
+
+.article-links p {
+    margin: 0;
+    padding: 0;
+}
+
+/******** Typograph *******/
+
+a {
+    text-decoration: none;
+}
+
+.header-links a {
+    color: #4169e1;
+}
+
+
+img {
+    border: 0;
+    margin: 0 auto;
+    display: block;
+}
+
+code {
+    background-color: #f9f2f4;
+    color: #c7254e;
+    padding: 2px 4px;
+}
+
+pre {
+    border: 1px solid;
+    border-radius: 3px;
+    padding: 0;
+    overflow: auto;
+}
+pre code {
+    color: inherit;
+    background-color: inherit;
+    display: block;
+    margin: 0;
+    padding: 4px;
+}

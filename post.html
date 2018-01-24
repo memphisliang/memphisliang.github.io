@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+        <meta charset="utf-8">
+        <link rel="stylesheet" href="style.css">
+    </head>
+
+    <body>
+        <div class="container">
+            <div id="header" class="module">
+                <div class="header-links">
+                    [<a href="#">harveyliang.com</a>]
+                    [<a href="#">@harveyliang</a>]
+                </div>
+            </div>
+
+            <div id="content" class="module">
+                <div id="article">
+                    <h1>开发一个漫画下载器(爬虫)</h1>
+
+                    <h2>目标</h2>
+
+                    <p>之所以想要开发一个简单的漫画下载器，或者称之为漫画爬虫，是因为之前一直在用的那个漫画下载器失效了，而其他的下载器是各种不满意，各种原因之下萌生了自己动手开发一个漫画下载器的想法。</p>
+
+                    <p>这个漫画下载器是针对我自己的需求来开发的，因为我主要使用动漫之家漫画网来看漫画，所以这个下载器就针对这个网站来开发。</p>
+
+                    <p>虽然这个漫画下载器只能用在动漫之家漫画网上，但它的实现思路也可以用在其他漫画网上，可以供大家参考。</p>
+
+                    <p>这篇文章是介绍如何实现一个漫画下载器，它的功能如下：</p>
+
+                    <p>输入一个漫画章节的网址，如： http://manhua.dmzj.com/grandblue/28907.shtml ， 下载这个章节的所有漫画图片。</p>
+
+                    <p>这个功能也是漫画下载器的主要功能，其他功能可以自己来开发。</p>
+
+                    <h2>解决思路</h2>
+
+                    <p>爬虫抓取图片的常见思路是在网页上查找图片地址，然后向该地址发起请求，下载图片。</p>
+
+                    <p>但分析动漫之家的网页源代码之后，发现他们是使用AJAX技术来加载图片的，所以在网页源代码中不包含漫画图片的网址。AJAX技术也是一种常见的反爬虫措施。</p>
+
+                    <h3>思路一：爬虫模拟人工下载</h3>
+
+                    <p>这个方法是指利用Selenium + Chrome等软件，模拟人浏览网页来获得漫画图片的网址，并进行下载。</p>
+
+                    <p>但这个方案有一些缺点，如需要判断网页是否加载完毕，然后才可以获得图片下载地址。而另一个更大的缺点就是这个方法是使用浏览器的，就是说网页的渲染，加载JS脚本等行为也要进行，这样就大大加大了图片下载所需要的时间。这是令人难以忍受的。</p>
+
+                    <h3>思路二：模拟手机APP请求</h3>
+
+                    <p>动漫之家漫画还有一个手机APP，这个APP提供了漫画章节的下载功能，我们可以通过捕获APP的请求报文，分析并仿造我们需要的报文来进行下载。</p>
+
+                    <p>这个方法下载的是章节图片的压缩包，速度应该比网页逐张图片下载要快，这个方法我没有试过，因为捕获报文什么的太麻烦了，但大家可以试试。</p>
+
+                    <h3>思路三：爬虫发出图片请求下载</h3>
+
+                    <p>动漫之家的网页上使用了AJAX技术，但动漫之家移动版（m.dmzj.com）的网页并没有使用AJAX技术，所以我们可以在源代码直接获得该章节的所有图片地址。</p>
+
+                    <p>这样，我们向 m.dmzj.com 发起请求，在网页源代码中获得图片地址，然后对所有图片地址发起下载请求来下载图片。</p>
+
+                    <h2>具体实现</h2>
+
+                    <p>以下是爬虫的具体实现，我们用一个例子来说明工作原理。那么我们现在要下载一个漫画章节中包含的所有图片，章节网址是 http://m.dmzj.com/view/14370/28907.html</p>
+
+                    <h3>步骤一：获取网页源代码</h3>
+
+                    <p>我们使用Python的第三方库Requests，这个库强大和方便，也建议大家使用，当然其他库也是可以使用的，只要可以获得网页源代码。</p>
+
+                    <p>这使用来测试<code>class</code>的段落。</p>
+
+<pre><code>>>> import requests
+>>> resp = requests.get("http://m.dmzj.com/view/14370/28907.html")
+>>> html = resp.text
+</code></pre>
+                    <p>这样就可以获得网址的网页源代码了，十分简单方便。</p>
+
+                    <h3>步骤二：获取图片地址</h3>
+
+                    <img src="http://ww3.sinaimg.cn/mw690/ab54b2c0gw1f95xlpwx54j20eo04xq4f.jpg">
+
+                    <p>接下来我们分析获得的网页源代码，可以发现图片网址是用JSON格式包含在JavaScript脚本代码中的，我们可以用正则表达式获得JSON文本，然后使用JSON库转换为字符串对象。</p>
+
+<pre><code>>>> import re
+>>> import json
+>>> json_text = re.findall("mReader\.initData.*", html)[0]
+>>> json_text = json_text.split('{')[1].split('}')[0]
+>>> picture_addrs = json.loads('{' + json_text + '}')["page_url"]
+</code></pre>
+
+                    <p>这样我们就获得了一个包含所有图片地址的列表了。</p>
+
+                    <h3>步骤三：对图片发起请求</h3>
+
+                    <p>接下来就是对每个地址发起下载请求了，但现在还不行，因为动漫之家的服务器会对每个请求进行检查，查看是否是来自自己的请求，所以我们还有一个步骤，就是伪造请求来欺骗服务器。</p>
+
+                    <p>怎样伪造请求呢？我们使用Request库来做，十分简单，只要在请求头中加入User-Agent和Referer两项就可以了，以下是代码：</p>
+
+<pre><code>
+>>> headers = {
+...     "User-Agent": "Mozilla/5.0 (Windows NT 6.2; WOW64; row:48.0)"
+...                   + " Gecko/2010010 Firefox/48.0",
+...     "Referer": "http://manhua.dmzj.com/grandblue/28907.shtml",
+... }
+>>>
+>>> addr = picture_addrs[0]
+>>> resp = requests.get(addr, headers=headers)
+>>> picture = resp.content
+>>> with open("1.jpg", "wb") as f:
+...     f.write(picture)
+>>>
+</code>
+</pre>
+
+                    <p>解释一下，User-Agent和Referer两项都是可以改的，只要符合要求就可以了，初学者直接使用上面的代码就可以了，向了解更多可以去Google一下这两项的作用。</p>
+
+                    <img src="http://ww4.sinaimg.cn/mw690/ab54b2c0gw1f95xlpaxvej20as0f9whj.jpg">
+
+                    <p>在这里我只展示了下载一个图片，要下载所有图片，只要对列表中的每个地址都做一遍这个操作就可以了，即添加一个循环。</p>
+
+                    <h3>注意</h3>
+
+                    <ul>
+                        <li>这只是一个简单的漫画下载器实现，它没有错误处理的功能，而一个成熟的爬虫都必须有错误处理，谁也不想晚上启动爬虫，第二天却得到一个错误退出的提示。</li>
+                        <li>我实现了一个拥有更多功能的爬虫，也是针对动漫之家漫画网的，代码可以在我的Github找到。</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="article-links">
+                <p><b>Latest:</b> <a href="#">HOWTO: Get tenure</a></p>
+                <p><b>Rand:</b> <a href="#">American Airlines sucks</a></p>
+                <p><b>Prev:</b> <a href="#">HOWTO: Get tenure</a></p>
+                <p><b>Next:</b> <a href="#">Parsing BibTex into S-Expressions,JSON,XML and BibTeX</a></p>
+            </div>
+        </div>
+    </body>
+</html>
