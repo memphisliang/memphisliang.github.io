@@ -1,0 +1,11 @@
+baseurl: /
+
+# 自定义模板变量
+
+github_url: https://github.com/memphisliang
+
+# Markdown设置
+
+markdown: kramdown
+kramdown:
+    input: GFM

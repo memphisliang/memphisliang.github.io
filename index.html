@@ -1,0 +1,16 @@
+---
+layout: default
+title: 豪辉的博客
+---
+
+{% include header.html %}
+
+<div id="content" class="module">
+    <div class="article-block">
+        <ul>
+            {% for post in site.posts %}
+                <li><a href="{{ post.url }}">{{ post.title }}</a></li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
