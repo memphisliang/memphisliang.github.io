@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+        <meta charset="utf-8">
+        <link rel="stylesheet" href="/assets/css/style.css">
+        <title>在Debian8上编译安装Python3</title>
+    </head>
+
+    <body>
+        <div class="container">
+            <div id="header" class="module">
+    <div class="header-links">
+        [<a href="/">首页</a>]
+        [<a href="https://github.com/memphisliang">@Github</a>]
+    </div>
+</div>
+
+
+<div id="content" class="module">
+    <div class="article">
+        <h1 id="在-debian-8-上编译安装-python-3">在 Debian 8 上编译安装 Python 3</h1>
+
+<p>在本篇博文中，会教大家如何在Debian系统上编译安装Python 3，在过程中还会简单解释一些编译常识。</p>
+
+<p>从源码编译安装一个软件在Linux系统中是十分常见的一件事，无论是在Debian（官方仓库中的软件太旧），CentOS（软件不全），还是ArchLinux（软件更新太快，想用旧版本）中都需要编译软件，所以了解如何编译软件对使用Linux十分有用。</p>
+
+<h2 id="编译前准备">编译前准备</h2>
+
+<p>在任何一个Linux系统中编译一个软件，都需要一些基本开发软件的支持，如gcc，g++编译器，链接器等，还需要待编译软件所需要的支持库。</p>
+
+<p>在编译Python之前，我们需要安装<code class="highlighter-rouge">libssl-dev</code>和<code class="highlighter-rouge">build-essential</code>两个库，<code class="highlighter-rouge">build-essential</code>库提供了gcc等编译软件，而<code class="highlighter-rouge">libssl-dev</code>库是编译Python所需的库，如果没有这个库，Python 3的编译会失败。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code># apt-get install build-essential libssl-dev
+</code></pre></div></div>
+
+<p>有时除了安装必须的库之外，还有一些额外的库会被建议安装，这些库不是软件必须的，但安装这些库会让软件提供更强大的功能或效率，所以建议大家安装。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code># apt-get install make zlib1g-dev libbz2-dev libsqlite3-dev
+</code></pre></div></div>
+
+<p>上面这些库是编译 Python 3 之前建议建议大家安装的，除了可以让Python提供更多的功能之外，有时还会避免以后使用<code class="highlighter-rouge">pip</code>等工具安装其他第三方库时出现一些莫名其妙的错误。</p>
+
+<h2 id="configure设置">configure设置</h2>
+
+<p>安装完必须的库之后就是配置编译选项了，软件提供的源码中通常包含一个<code class="highlighter-rouge">configure</code>脚本，我们可以用它来配置一些编译选项，如软件安装的位置，优化选项等。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ ./configure --help
+</code></pre></div></div>
+
+<p>可以用上面的命令来参看脚本提供的配置选项，编译软件中最常用的编译选项是<code class="highlighter-rouge">--prefix</code>选项，可以用这个选项来决定软件安装的位置。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ ./configure --prefix=/usr/local/python3
+</code></pre></div></div>
+
+<p>在这里我们把Python安装在<code class="highlighter-rouge">/usr/local/python3</code>这个目录中，这样会方便我们以后管理这些自己编译的软件。</p>
+
+<p>如果不使用<code class="highlighter-rouge">--prefix</code>选项，软件通常会自动安装在<code class="highlighter-rouge">/usr/local</code>目录下，并按文件类型分布在<code class="highlighter-rouge">/usr/local/bin</code>和<code class="highlighter-rouge">/usr/local/lib</code>等多个目录中，之后我们要删除这个软件就会十分困难。</p>
+
+<p>使用<code class="highlighter-rouge">--prefix</code>选项把软件的所有文件安装在一个单独的目录中，这里是<code class="highlighter-rouge">/usr/local/python3</code>，之后我们想删除这个软件，只需要直接删除<code class="highlighter-rouge">python3</code>这个目录就可以了，大大方便了我们之后的管理。</p>
+
+<h2 id="安装">安装</h2>
+
+<p>配置完就是编译了，我们使用<code class="highlighter-rouge">make</code>命令来编译软件，它会自动把源码编译成可执行文件，注意，这个命令不需要root权限，因为它只是生成可执行文件，但还没有安装到系统中。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ make
+</code></pre></div></div>
+
+<p>然后是安装，因为要存取<code class="highlighter-rouge">/usr/local</code>目录，所以需要root权限。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code># make install
+</code></pre></div></div>
+
+<h2 id="修改path环境变量">修改PATH环境变量</h2>
+
+<p>经过以上的编译安装，软件已经在我们的系统中了，但我们还需要把软件路径添加到环境变量$PATH中，不然系统就搜索不到这个命令。</p>
+
+<p>在<code class="highlighter-rouge">~/.bashrc</code>文件的最后添加以下代码，以使每次登陆设置都会生效。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>PATH="/usr/local/python3/bin:$PATH"
+</code></pre></div></div>
+
+<p>注意： 路径中是<code class="highlighter-rouge">/usr/local/python3/bin</code>，而不是<code class="highlighter-rouge">/usr/bin/python3</code>，因为<code class="highlighter-rouge">python3</code>这个可执行文件是在<code class="highlighter-rouge">bin</code>目录下的，如果设置为<code class="highlighter-rouge">/usr/local/python3</code>，它只会搜索<code class="highlighter-rouge">python3</code>目录，而不会搜索<code class="highlighter-rouge">python3</code>目录下的<code class="highlighter-rouge">bin</code>目录，就会找不到命令。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ python3 -V
+</code></pre></div></div>
+
+<p>使用这个命令来测试是否成功，这个命令应该会输出当前Python的版本信息。</p>
+
+<h2 id="删除软件">删除软件</h2>
+
+<p>之后，如果我们想要删除python3，只需要删除<code class="highlighter-rouge">/usr/local/python3</code>这个安装时设置的目录，然后在把$PATH中的路径删除就可以了。</p>
+
+<p>或者我们可能需要重编译软件，就只需要覆盖这个目录就好。</p>
+
+    </div>
+</div>
+
+        </div>
+    </body>
+</html>

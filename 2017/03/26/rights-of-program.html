@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+        <meta charset="utf-8">
+        <link rel="stylesheet" href="/assets/css/style.css">
+        <title>进程的权限</title>
+    </head>
+
+    <body>
+        <div class="container">
+            <div id="header" class="module">
+    <div class="header-links">
+        [<a href="/">首页</a>]
+        [<a href="https://github.com/memphisliang">@Github</a>]
+    </div>
+</div>
+
+
+<div id="content" class="module">
+    <div class="article">
+        <h1 id="apue笔记--进程的权限">APUE笔记 —— 进程的权限</h1>
+
+<h2 id="权限的概念">权限的概念</h2>
+
+<p>本篇文章说的是Linux系统中的进程的权限。在Linux系统中，进程的权限与文件的权限息息相关，进程的权限说的就是这个进程是否可以读写或执行另一个文件，本质上，进程具有的权限就是其二进制执行文件具有的权限，以下具体说明这个概念。</p>
+
+<h3 id="不读写文件的程序">不读写文件的程序</h3>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+
+int
+main(void) {
+	int sum = 0, i;
+
+	for (i = 1; i &lt;= 100; i++) {
+		sum += i;
+	}
+
+	printf("sum = %d\n", sum);
+
+	exit(0);
+}
+</code></pre></div></div>
+
+<p>这是一个计算从1加到100的和的程序，这个程序并不打开其他文件（读写或执行），所以这个程序并不需要关注权限的问题，只要你有执行这个二进制文件（程序本身）的权限就可以输出结果。</p>
+
+<h3 id="读写文件的程序">读写文件的程序</h3>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+
+int
+main(void) {
+	FILE *fp;
+	char ch;
+
+	if ((fp = fopen("test.txt", "rt")) == NULL) {
+		perror("a.out cannot open file");
+		exit(1);
+	}
+	ch = fgetc(fp);
+	while (ch != EOF) {
+		putchar(ch);
+		ch = fgetc(fp);
+	}
+	fclose(fp);
+
+	exit(0);
+}
+</code></pre></div></div>
+
+<p>第二个程序打开了一个文本文件<code class="highlighter-rouge">test.txt</code>，平常的编程中，我们并不需要关注权限的问题，因为我们通常都是自己编译程序，两个文件的所有者都是同一个用户，自然具有读写权限，如下：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ ls -la
+-rwxr-xr-x 1 harvey users 8624 Mar 24 11:04 a.out
+-rw-r--r-- 1 harvey users   14 Mar 24 11:02 test.txt
+
+$ ./a.out
+Hello, world!
+</code></pre></div></div>
+
+<p>如果我们把<code class="highlighter-rouge">test.txt</code>文件的所有者和组改成其他用户，并去掉其他用户的权限（即我们不具有权限读文件），那么程序就不可以输出文件的内容了：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ chmod o-r test.txt
+$ sudo chown stuart:stuart test.txt
+$ ls -la
+-rwxr-xr-x 1 harvey users  8624 Mar 24 11:04 a.out
+-rw-r----- 1 stuart stuart   14 Mar 24 11:02 test.txt
+$ ./a.out
+a.out cannot open file: Permission denied
+</code></pre></div></div>
+
+<p>由以上两个程序可见，只有读写执行其他文件的程序才需要关注进程的权限，而进程的权限只有与打开的文件的权限两者结合才有意义。</p>
+
+<h2 id="文件的权限">文件的权限</h2>
+
+<p>就像以上所说，进程的权限与文件的权限息息相关，进程是否可以使用一个文件（读写执行）取决于该文件所需的权限，以下我们来了解什么是文件的权限。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ ls -la
+total 28
+drwxr-xr-x 2 harvey users  4096 Mar 24 11:04 .
+drwx------ 7 harvey users  4096 Mar 24 11:04 ..
+-rwxr-xr-x 1 harvey users  8624 Mar 24 11:04 a.out
+-rw-r--r-- 1 harvey users   330 Mar 24 11:03 test.c
+-rw-r----- 1 stuart stuart   14 Mar 24 11:02 text.txt
+</code></pre></div></div>
+
+<p>我们可以看到用<code class="highlighter-rouge">ls -la</code>命令列出当前目录的所有文件，每一个文件的最前面都有<code class="highlighter-rouge">drwx</code>等字符，这些字符就代表了文件权限，如：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>-rwxr-xr-x 1 harvey users 8624 Mar 24 11:04 a.out
+</code></pre></div></div>
+
+<p>前面10个字符中，第一个字符代表了这个文件是什么类型的文件，<code class="highlighter-rouge">d</code>代表目录，<code class="highlighter-rouge">-</code>代表普通文件。</p>
+
+<p>后9个字符代表了这个文件的权限，<code class="highlighter-rouge">r</code>表示具有读权限，<code class="highlighter-rouge">w</code>表示具有写权限，<code class="highlighter-rouge">x</code>表示具有执行权限（如果文件可以执行），如果不具有该权限就用<code class="highlighter-rouge">-</code>表示。</p>
+
+<p>那为什么一个文件有三组<code class="highlighter-rouge">rwx</code>呢？因为三组<code class="highlighter-rouge">rwx</code>对应三种用户对这个文件的权限：</p>
+
+<ul>
+  <li>第一组，对应文件拥有者的权限，在这里是用户harvey的权限</li>
+  <li>第二组，对应文件所属组用户的权限，在这里是组users，即组users成员用户的权限</li>
+  <li>第三组，对应其他用户（不是以上两种用户）的权限，在这里是指不是harvey用户也不是组users的用户</li>
+</ul>
+
+<p>我们在来分析一下<code class="highlighter-rouge">a.out</code>这个文件，每种用户都具有什么权限：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>-rwxr-xr-x 1 harvey users 8624 Mar 24 11:04 a.out
+</code></pre></div></div>
+
+<ul>
+  <li>harvey用户：harvey用户就是这个文件的所有者，对应第一组rwx，他具有读<code class="highlighter-rouge">r</code>、写<code class="highlighter-rouge">w</code>和执行<code class="highlighter-rouge">x</code>权限</li>
+  <li>组users用户：组users是这个文件的所属组，组users成员用户对应于第二组rwx，具有读<code class="highlighter-rouge">r</code>和执行<code class="highlighter-rouge">x</code>权限</li>
+  <li>其他用户：不是以上两种用户的stuart用户，他具有读<code class="highlighter-rouge">r</code>和执行<code class="highlighter-rouge">x</code>权限</li>
+</ul>
+
+<p>文件的权限决定了一个用户可以对它执行的操作（读写执行）。</p>
+
+<h3 id="目录的权限">目录的权限</h3>
+
+<p>要读写执行一个文件，只具有该文件的权限是不行的，你还需要具有该文件所在目录的权限，而目录的权限和普通文件的权限有点区别，以下详细介绍。</p>
+
+<h4 id="打开文件所需的目录权限">打开文件所需的目录权限</h4>
+
+<p>如果你要读写执行一个普通文件（如文本文件），不但需要具有该文件的读写执行权限，还需要该文件名中包含的每一个目录的执行权限：</p>
+
+<p>如果我们在程序中读（写或执行）<code class="highlighter-rouge">/usr/include/stdio.h</code>，需要目录<code class="highlighter-rouge">/</code>、<code class="highlighter-rouge">/usr</code>和<code class="highlighter-rouge">/include</code>具有执行权限，然后具有文件<code class="highlighter-rouge">stdio.h</code>的读（写或执行）权限。</p>
+
+<p>如果当前目录是<code class="highlighter-rouge">/usr/include</code>，那么为了打开文件<code class="highlighter-rouge">stdio.h</code>，需要具有<code class="highlighter-rouge">/usr/include</code>的执行权限，这是隐含的，即我们没有具体写出路径目录，但也需要具有该目录的权限。</p>
+
+<h4 id="目录文件权限的含义">目录文件权限的含义</h4>
+
+<p>目录文件读写执行的含义与普通文件的含义有些不同：</p>
+
+<ul>
+  <li>目录的读权限允许我们读目录，获得该目录中所有文件名的列表</li>
+  <li>目录的执行权限允许我们通过（进入）该目录，并搜索该目录下的特定文件</li>
+  <li>为了在一个目录中创建一个文件，需要该目录的写权限和执行权限</li>
+  <li>为了在一个目录中删除一个文件，需要包含该文件的目录的写权限和执行权限，但不需要文件本身的读写权限</li>
+</ul>
+
+<h2 id="进程的权限">进程的权限</h2>
+
+<p>上面说了那么多关于文件的权限，那进程的权限又是什么呢？</p>
+
+<p>现在来说说进程权限的本质，一个进程并不保存其具有的权限，而是保存用户和组的ID，在根据这些ID来决定是否对文件具有权限，一个进程可以简单的看做是一个用户，这样就转变为该用户是否具有操作该文件的权限的问题了。</p>
+
+<p>与一个进程相关的ID有6个或更多：</p>
+
+<ul>
+  <li>实际用户ID</li>
+  <li>实际组ID</li>
+  <li>有效用户ID</li>
+  <li>有效组ID</li>
+  <li>附加组ID</li>
+  <li>保存的设置用户ID</li>
+  <li>保存的设置组ID</li>
+</ul>
+
+<p>进程的权限基本由这6个ID来决定。</p>
+
+<ul>
+  <li>实际用户ID和实际组ID标识我们究竟是谁，即执行程序的用户和组</li>
+  <li>有效用户ID、有效组ID和附加组ID决定了我们的文件访问权限</li>
+  <li>保存的设置用户ID和保存的设置组ID在这里不讨论</li>
+</ul>
+
+<p>如上面所说，进程可以看做是一个用户，这个用户就由有效用户ID、有效组ID和附加组ID来决定。</p>
+
+<p>例如需要读一个文件，内核就检查进程的这三个ID，如果这三个ID中有一个具有文件的读权限，那么进程就具有读该文件的权限，可以读该文件。</p>
+
+<h3 id="设置用户id和设置组id">设置用户ID和设置组ID</h3>
+
+<p>通常，有效用户ID等于实际用户ID，有效组ID等于实际组ID。</p>
+
+<p>为什么进程的权限是由有效ID来决定，而不是实际ID决定呢？因为这样可以更灵活的赋予进程权限。</p>
+
+<p>我们可以在文件的权限中设置：当执行此文件（程序）时，将进程的有效用户ID设置为文件所有者ID，与此类似，也可以设置当执行文件时有效组ID等于文件的组的ID。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ ls -la a.out
+-rwxr-xr-x 1 harvey users 8624 Mar 24 11:04 a.out
+$ chmod u+s a.out
+$ ls -la a.out
+-rwsr-xr-x 1 harvey users 8624 Mar 24 11:04 a.out
+$ chmod g+s a.out
+$ ls -la a.out
+-rwsr-sr-x 1 harvey users 8624 Mar 24 11:04 a.out
+</code></pre></div></div>
+
+<p>我们可以看到，上面的<code class="highlighter-rouge">a.out</code>文件的所有者权限和组权限中的执行位为<code class="highlighter-rouge">s</code>，这表示当执行此程序时，有效用户ID和有效组ID都会设置为文件所有者和组的ID，而不是实际用户和实际组ID（执行程序的用户和组ID）。</p>
+
+<p>Linux系统中的passwd命令就使用了这种方法。因为该程序应该能将用户的新密码写入密码文件（/etc/shadow）中，而只有超级用户才具有对密码文件的写权限，所以需要使用设置用户ID的方法来实现。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ ls -la /usr/bin/passwd
+-rwsr-xr-x 1 root root 52528 Oct 29 23:54 /usr/bin/passwd
+$ ls -la /etc/shadow
+-rw------- 1 root root 852 Mar 24 12:04 /etc/shadow
+</code></pre></div></div>
+
+<p>可以看到，第三组权限是<code class="highlighter-rouge">r-x</code>，即所有用户都可以执行<code class="highlighter-rouge">passwd</code>命令，如果没有使用设置有效用户ID，即第一组权限是<code class="highlighter-rouge">rwx</code>，那程序的有效用户ID和有效组ID就是实际用户ID和实际组ID，程序就没有权限去写<code class="highlighter-rouge">/etc/shadow</code>文件，程序执行失败。</p>
+
+<p>而设置了有效用户和有效组ID为文件所有者<code class="highlighter-rouge">root</code>，程序就具有写权限，可以成功执行程序。</p>
+
+<h3 id="内核权限测试">内核权限测试</h3>
+
+<p>最后在给出内核对进程的权限测试过程，以下过程是按循序进行的：</p>
+
+<ol>
+  <li>若进程的有效用户ID是0（root用户），则允许访问，root用户具有最高权限</li>
+  <li>若进程的有效用户ID等于文件的所有者ID，那么测试文件所有者是否具有对应权限（第一组rwx）</li>
+  <li>若进程的有效组ID或进程的附加组ID之一等于文件的组ID，那么测试文件组ID的权限（第二组rwx）</li>
+  <li>测试其他用户是否具有对应权限（第三组rwx），进程如果不属于以上三种用户，则必定是其他用户</li>
+</ol>
+
+<p>内核按顺序执行这四步，注意，如果进程拥有此文件（第2步），则按用户访问权限批准或拒绝进程对文件的访问，无论是批准还是拒绝，都不会继续测试下面两步（组和其他用户）。其余3步都是如此处理——如果是root用户，第一步通过，不测试下面三步。</p>
+
+    </div>
+</div>
+
+        </div>
+    </body>
+</html>

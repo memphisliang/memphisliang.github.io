@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+        <meta charset="utf-8">
+        <link rel="stylesheet" href="/assets/css/style.css">
+        <title>文件描述符详解</title>
+    </head>
+
+    <body>
+        <div class="container">
+            <div id="header" class="module">
+    <div class="header-links">
+        [<a href="/">首页</a>]
+        [<a href="https://github.com/memphisliang">@Github</a>]
+    </div>
+</div>
+
+
+<div id="content" class="module">
+    <div class="article">
+        <h1 id="apue笔记--文件描述符详解">APUE笔记 —— 文件描述符详解</h1>
+
+<p>这一系列的博文是我读《Unix环境高级编程》这本书的笔记，记录了我认为的书中的重点知识。这篇博文是讨论关于文件描述符的细节。</p>
+
+<p>什么是文件描述符？文件描述符是一个非负整数，当你调用C语言中open，creat等系统调用函数时，它们返回一个非负整数，即文件描述符，这个文件描述符与write，read等函数共同使用来读写文件。</p>
+
+<p>文件描述符是文件IO的基础，了解这些概念对我们的编程十分有利。</p>
+
+<h2 id="打开的文件">打开的文件</h2>
+
+<p>内核使用三种数据结构表示一个打开的文件。</p>
+
+<ul>
+  <li>
+    <p>每个进程在系统进程表中都有一个纪录项。</p>
+  </li>
+  <li>
+    <p>每个进程纪录项在内部都含有一个记录着当前进程打开的文件描述符的结构（或者可以直接视为每个进程都保存着一张表），可将该结构视为一张表，每个描述符占一行。与每个文件描述符相关联的是：</p>
+
+    <ul>
+      <li>
+        <p>文件描述符标志（FD标志），保存该文件描述符的设置状态，这些设置状态确定了这个文件描述符在一些操作，如fork一个进程时对这个文件描述符执行的操作。</p>
+      </li>
+      <li>
+        <p>指向一个文件表项的指针</p>
+      </li>
+    </ul>
+  </li>
+  <li>
+    <p>内核为所有被打开的文件维持一张文件表。每个文件表项包含：</p>
+
+    <ul>
+      <li>
+        <p>文件状态标志（读<code class="highlighter-rouge">O_RDONLY</code>、写<code class="highlighter-rouge">O_WRONLY</code>、添写<code class="highlighter-rouge">O_APPEND</code>和同步<code class="highlighter-rouge">O_SYNC</code>等文件状态，详见open函数和fcntl函数）</p>
+      </li>
+      <li>
+        <p>当前文件偏移量（主要由lseek函数设置）</p>
+      </li>
+      <li>
+        <p>指向该文件v节点表项的指针</p>
+      </li>
+    </ul>
+  </li>
+  <li>
+    <p>每个打开文件都有一个v节点（v-node）结构。v节点包含了文件类型和对此文件进行各种操作函数的指针，v节点还包含了该文件的i节点，i节点保存了文件的所有者，文件长度，文件所在设备，指向文件实际数据块在磁盘上所在位置的指针等信息。</p>
+  </li>
+</ul>
+
+<p><img src="https://i.loli.net/2018/01/24/5a687a8455f23.jpg" alt="打开的文件的内核数据结构" title="打开的文件的内核数据结构" /></p>
+
+<p>上图描述了进程中三张表之间的关系。该进程有两个不同的被打开的文件：一个文件为标准输入（文件描述符0），另一个文件为标准输出（文件描述符1）。</p>
+
+<p>下面是两个独立进程同时打开同一个文件时三张表的状态：</p>
+
+<p><img src="https://i.loli.net/2018/01/24/5a687abc78e26.jpg" alt="两个独立进程各自打开同一个文件" title="两个独立进程各自打开同一个文件" /></p>
+
+<p>假定第一个进程在文件描述符3上打开文件，而另一个进程在文件描述符4上打开同一文件。每个进程都有自己的文件表项，进程拥有自己的文件表项的一个理由是：这种安排使每个进程都有它自己的对该文件的当前偏移量。</p>
+
+<h3 id="打开文件状态的修改">打开文件状态的修改</h3>
+
+<ul>
+  <li>在完成每个write后，在文件表项中的当前文件偏移量增加所写的字节数。如果这是当前文件偏移量超过了当前文件长度，则在i节点表项中的当前文件长度被设置为当前文件偏移量（也就是该文件加长了）。</li>
+  <li>如果在open等函数中用<code class="highlighter-rouge">O_APPEND</code>标志打开了一个文件，则相应标志也被设置到文件表项的文件状态标志中。</li>
+  <li>若一个文件用lseek定位到文件当前的尾端，则文件表项中的当前文件偏移量被设置为i节点表项中的当前文件长度。（注意，lseek定位到文件尾端和使用<code class="highlighter-rouge">O_APPEND</code>标志有一些不同，在后面的lseek函数介绍中有讲解）</li>
+  <li>lseek函数只修改文件表项中的当前文件偏移量，没有进行任何I/O操作。</li>
+  <li>可能有多个文件描述符指向同一个文件表项（使用dup和dup2函数复制文件描述符），后面有讲解。</li>
+</ul>
+
+<h2 id="函数介绍">函数介绍</h2>
+
+<p>在这里只介绍open函数和lseek函数，分别用来打开文件和调整当前文件偏移量（之后会解释什么是当前文件偏移量），而其他的read, write和close等相关的函数默认读者已经了解如何使用，这里不再介绍，如果不会，网上有一大堆教程，大家搜索一下就好。</p>
+
+<h3 id="open函数">open函数</h3>
+
+<p>在C语言中的open函数是一个底层函数，它是对系统调用的简单封装，Unix系列系统对系统提供的每一个系统调用都实现一个同名的C函数，lseek，read，write和close等函数都是如此，以下系统调用和函数默认是同一个概念，不做区分。</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>#include &lt;fcntl.h&gt;
+
+int open(const char *path, int oflag, ...);
+				//返回值：若成功则返回文件描述符，若出错则返回-1
+</code></pre></div></div>
+
+<p>open函数返回的文件描述符一定是当前最小的未用描述符数字，path参数给出文件路径，oflag参数设置文件应该用什么状态打开，oflag参数是以下常量的组合（或运算）：</p>
+
+<ul>
+  <li>O_RDONLY    只读打开</li>
+  <li>O_WRONLY    只写打开</li>
+  <li>O_RDWR      读、写打开</li>
+</ul>
+
+<p>以上三个常量必须制定一个，而且只能指定一个。下面的常量则可以自由选择：</p>
+
+<ul>
+  <li>
+    <p><code class="highlighter-rouge">O_APPEND</code>，每次写时都追加到文件的尾端。当此选项被设置，当前文件偏移量对写操作不起作用，即每次执行write等函数，系统会自动把数据添加到文件末尾。</p>
+  </li>
+  <li>
+    <p><code class="highlighter-rouge">O_CREAT</code>，若文件不存在，则创建它，使用此选项需要使用第三个参数mode指定文件的访问权限。</p>
+  </li>
+  <li>
+    <p><code class="highlighter-rouge">O_TRUNC</code>，如果文件存在，而且使用O_WRONLY或O_RDWR打开，则将其长度截断为0（清空文件内容）。</p>
+  </li>
+  <li>
+    <p><code class="highlighter-rouge">O_SYNC</code>，使每次write都等到物理I/O操作完成。</p>
+  </li>
+  <li>
+    <p>还有其他选项，这里不在说明。</p>
+  </li>
+</ul>
+
+<p>上述状态被保存在文件表中，对应于一个或多个文件描述符。以下是一个使用例子：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>fd = open(pathname, O_RDWR | O_CREAT)
+</code></pre></div></div>
+
+<p>这个例子使用读写打开，如果文件不存在则创建。</p>
+
+<h3 id="lseek函数">lseek函数</h3>
+
+<h4 id="lseek函数定义">lseek函数定义</h4>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>#include &lt;unistd.h&gt;
+
+off_t lseek(int filedes, off_t offset, int whence);
+				//返回值：若成功则返回新的文件偏移量，若出错则返回-1
+</code></pre></div></div>
+
+<p>对参数offset的解释与参数whence的值有关：</p>
+
+<ul>
+  <li>
+    <p>如果whence的值是SEEK_SET，则将该文件的偏移量设置为距文件开始出offset个字节。</p>
+  </li>
+  <li>
+    <p>如果whence的值是SEEK_CUR，则将该文件的偏移量设置为其当前值加offset个字节，offset可为正数或负数。</p>
+  </li>
+  <li>
+    <p>如果whence的值是SEEK_END，则将该文件的偏移量设置为文件长度加offset个字节，offset可为正数或负数。</p>
+  </li>
+</ul>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>off_t curr_pos;
+curr_pos = lseek(fd, 0, SEEK_CUR);  //当前文件偏移量没有改变（offset = 0）
+</code></pre></div></div>
+
+<h4 id="lseek函数与open函数中o_append标志的区别">lseek函数与open函数中O_APPEND标志的区别</h4>
+
+<p>如果我们要在文件末尾增加数据要怎么做？</p>
+
+<p>可以在open函数打开文件时设置O_APPEND标志（或使用fcntl函数设置），还可以将lseek函数与write函数共用：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>if (lseek(fd, 0, SEEK_END) &lt; 0)  /* 设置当前文件偏移量为文件末尾 */
+	printf("lseek error");
+if (write(fd, buf, 100) != 100)  /* 写入数据 */
+	printf("write error");
+</code></pre></div></div>
+
+<p>但使用上述两个函数有时会产生一个问题，当有多个进程同时使用这种方法将数据添加到同一个文件时会产生冲突。</p>
+
+<p>假定有两个独立的进程A和B都对同一个文件进行添加操作，每个进程都已打开该文件，但未使用<code class="highlighter-rouge">O_APPEND</code>标志。此时，各数据结构之间的关系如下图：</p>
+
+<p><img src="https://i.loli.net/2018/01/24/5a687abc78e26.jpg" alt="两个独立进程各自打开同一个文件" title="两个独立进程各自打开同一个文件" /></p>
+
+<p>每个进程都有自己的文件表项，但共享一个v节点表项。</p>
+
+<p>假定进程A调用了lseek，它将进程A的该文件当前偏移量设置为1500字节（当前文件末尾处）。然后内核切换进程使进程B运行。进程B执行lseek，也将其该文件的当前偏移量设置为1500字节（当前文件末尾处）。然后B调用write函数，它将B的该文件当前偏移量增至1600。因为该文件的长度已经增加了，所以内核对v节点中的当前文件长度更新为1600。然后，内核又进行进程切换时进程A恢复运行。但A调用write时，就从其当前文件偏移量（1500字节）处将数据写到文件中。这样也就覆盖了进程B刚写到该文件中的数据。</p>
+
+<h4 id="原子操作">原子操作</h4>
+
+<p>问题出在逻辑操作“定位到文件末尾处，然后写上数据”，它使用了两个分开的函数调用。解决问题的方法是使这两个操作对于其他进程而言成为一个原子操作，原子操作就是一个操作要么不做，要么就全做，不存在做一半不做一半。任何一个需要多个函数调用的操作都不可能是原子操作，因为在两个函数之间，内核都有可能会临时挂起该进程。</p>
+
+<p>Unix系列系统提供了一种方法使这种操作成为一个原子操作，该方法就是在打开文件时设置<code class="highlighter-rouge">O_APPEND</code>标志。这就使得内核每次对文件进行写之前，都将进程的当前偏移量设置到该文件尾端处，于是在每次写之前就不用调用lseek。</p>
+
+<h3 id="dup和dup2函数">dup和dup2函数</h3>
+
+<p>dup函数和dup2函数用于文件描述符的复制。</p>
+
+<h4 id="函数定义">函数定义</h4>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>#include &lt;unistd.h&gt;
+
+int dup(int filedes);
+
+int dup2(int filedes, int filedes2);
+
+				//两个函数的返回值：成功返回新的文件描述符，出错返回-1
+</code></pre></div></div>
+
+<p>用dup返回的文件描述符一定是当前可用文件描述符中的最小数值。用dup2函数则可以用<code class="highlighter-rouge">filedes2</code>参数指定新文件描述符的数值，如果<code class="highlighter-rouge">filedes2</code>已经打开，则先将其关闭。如果<code class="highlighter-rouge">filedes</code>等于<code class="highlighter-rouge">filedes2</code>，则dup2返回<code class="highlighter-rouge">filedes2</code>，而不关闭它。</p>
+
+<p>这两个函数返回的文件描述符与原文件描述符共享同一个文件表项，即它们的文件状态标志和当前文件偏移量永远相同。</p>
+
+<h4 id="dup函数使用例子">dup函数使用例子</h4>
+
+<p>下图是使用dup函数复制一个文件描述符后两个文件描述符的状态：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>newfd = dup(1);
+</code></pre></div></div>
+
+<p><img src="https://i.loli.net/2018/01/24/5a687ad7c74e8.jpg" alt="执行dup后的内核数据结构" title="执行dup后的内核数据结构" /></p>
+
+<p>当此函数执行时，假定下一个可用的描述符是3。因为两个描述符指向同一个文件表项，所以它们共享同一文件状态标志（读、写、添加等）以及同一当前文件偏移量。</p>
+
+<p>另一个例子是多个dup2混合使用，如下：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>//假设fd的值为3
+dup2(fd, 0);
+dup2(fd, 1);
+dup2(fd, 2);
+if (fd &gt; 2)
+	close(fd);
+</code></pre></div></div>
+
+<p><img src="https://i.loli.net/2018/01/24/5a687a9f2796b.jpg" alt="多个dup2的使用" title="多个dup2的使用" /></p>
+
+<p>首先假定fd是一个打开的文件描述符（值为3），各函数执行结果如下：</p>
+
+<ul>
+  <li><code class="highlighter-rouge">dup2(fd, 0)</code>，文件描述符0是标准输入，函数首先关闭文件描述符0，然后在此文件描述符0上重新打开一个文件，此时文件描述符0于文件描述符3共享一个文件表项。</li>
+  <li><code class="highlighter-rouge">dup2(fd, 1)</code>，文件描述符1是标准输出，函数重复上面的操作，现在，进程有文件描述符0、1和3三个描述符都指向同一个文件。</li>
+  <li><code class="highlighter-rouge">dup2(fd, 2)</code>，同上，进程有文件描述符0、1、2和3都指向同一文件。</li>
+  <li><code class="highlighter-rouge">close(fd)</code>，进程关闭文件描述符3，现在剩下文件描述符0、1和2三个指向同一文件的描述符。</li>
+</ul>
+
+<!-------------- 链接 --------------------------->
+
+
+    </div>
+</div>
+
+        </div>
+    </body>
+</html>
